@@ -70,7 +70,7 @@ export const RoomPage = ({ id }) => {
   const handleOnReady = async ({ target: player }) => {
     console.log('On ready called')
 
-    const updateIntervalId = setInterval(() => {
+    const updateIntervalId = setInterval(async () => {
       // If you're the host of the room, update the database with the current time
       if (isHost === 'true') {
         const currentTime = player.getCurrentTime()
@@ -84,6 +84,21 @@ export const RoomPage = ({ id }) => {
             },
           },
         })
+      } else {
+        // If we're not the host we should always be checking the current time against our own time
+        const { data } = await getRoom()
+        const hostTime = data.room?.currentTime
+        if (hostTime) {
+          // Check if we're more than 5 seconds off of the host's timestamp and adjust if necessary
+          if (Math.abs(player.getCurrentTime() - hostTime) > 5) {
+            console.log(
+              'Diff with host is greater than 5 seconds, seeking to:',
+              hostTime
+            )
+
+            player.seekTo(hostTime)
+          }
+        }
       }
     }, 5000)
 
