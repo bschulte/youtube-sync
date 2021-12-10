@@ -1,7 +1,25 @@
-import { Link, routes } from '@redwoodjs/router'
-import { MetaTags } from '@redwoodjs/web'
+import { Button, Divider, Grid, Typography } from '@mui/material'
+import { navigate } from '@redwoodjs/router'
+import { MetaTags, useMutation } from '@redwoodjs/web'
+
+const CREATE_ROOM = gql`
+  mutation CreateRoomMutation($input: CreateRoomInput!) {
+    createRoom(input: $input) {
+      id
+    }
+  }
+`
 
 const HomePage = () => {
+  const [create] = useMutation(CREATE_ROOM)
+
+  const createRoom = async () => {
+    const { data } = await create({ variables: { input: {} } })
+    console.log('Room id:', data.createRoom.id)
+
+    navigate(`/rooms/${data.createRoom.id}?isHost=true`)
+  }
+
   return (
     <>
       <MetaTags
@@ -9,14 +27,19 @@ const HomePage = () => {
         description="Home page for Youtube syncing service"
       />
 
-      <h1>HomePage</h1>
-      <p>
-        Find me in <code>./web/src/pages/HomePage/HomePage.js</code>
-      </p>
-      <p>
-        My default route is named <code>home</code>, link to me with `
-        <Link to={routes.home()}>Home</Link>`
-      </p>
+      <Grid container justifyContent="center" direction="row">
+        <Grid item xs />
+        <Grid item xs={6}>
+          <Typography variant="h1">Youtube Sync</Typography>
+          <Divider />
+
+          <Button variant="contained" onClick={createRoom}>
+            Create Room
+          </Button>
+        </Grid>
+
+        <Grid item xs />
+      </Grid>
     </>
   )
 }
