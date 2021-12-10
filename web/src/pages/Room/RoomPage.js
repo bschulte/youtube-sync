@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Divider, Grid, TextField, Typography } from '@mui/material'
+import { Button, Divider, Grid, TextField, Typography } from '@mui/material'
+import ShareIcon from '@mui/icons-material/Share'
 import YouTube from 'react-youtube'
 import { useMutation } from '@redwoodjs/web'
 import { useLazyQuery } from '@apollo/client'
@@ -30,7 +31,7 @@ export const RoomPage = ({ id }) => {
   const [updateIntervalId, setUpdateIntervalId] = useState(null)
 
   const [updateRoom] = useMutation(UPDATE_ROOM)
-  const [getRoom] = useLazyQuery(GET_ROOM)
+  const [getRoom] = useLazyQuery(GET_ROOM, { variables: { id } })
 
   const handleKeyPress = (key) => {
     if (key.code === 'Enter') {
@@ -50,10 +51,7 @@ export const RoomPage = ({ id }) => {
 
   const getYoutubeId = () => {
     if (playingVideoUrl) {
-      const id = new URL(playingVideoUrl).searchParams.get('v')
-      console.log('Youtube video id:', id)
-
-      return id
+      return new URL(playingVideoUrl).searchParams.get('v')
     }
 
     return null
@@ -61,11 +59,17 @@ export const RoomPage = ({ id }) => {
 
   const handleVideoStateChange = (state) => {
     console.log('State:', state)
+
+    if (state.data === -1) {
+      state.target.playVideo()
+    }
   }
 
   const { isHost } = useParams()
 
-  const handleOnReady = ({ target: player }) => {
+  const handleOnReady = async ({ target: player }) => {
+    console.log('On ready called')
+
     const updateIntervalId = setInterval(() => {
       // If you're the host of the room, update the database with the current time
       if (isHost === 'true') {
@@ -84,12 +88,41 @@ export const RoomPage = ({ id }) => {
     }, 5000)
 
     setUpdateIntervalId(updateIntervalId)
+
+    // Start the video at the current time if we have one set for the room
+    setTimeout(async () => {
+      console.log('Playing video')
+
+      player.playVideo()
+      const { data } = await getRoom()
+      if (data.room?.currentTime) {
+        console.log('Initially seeking to current time:', data.room.currentTime)
+        player.seekTo(data.room.currentTime)
+      }
+    }, 2000)
+  }
+
+  const copyShareLinkToClipboard = () => {
+    const link = window.location.href.replace(window.location.search, '')
+    console.log('Copying share link to clipboard:', link)
+    navigator.clipboard.writeText(link)
+  }
+
+  const getPlayerOpts = () => {
+    if (!isHost) {
+      return {
+        disablekb: '1',
+        // controls: '0',
+      }
+    }
+
+    return {}
   }
 
   // Load existing Room data if available
   useEffect(() => {
     async function getData() {
-      const { data } = await getRoom({ variables: { id } })
+      const { data } = await getRoom()
       console.log('Init data:', data)
 
       if (data.room?.videoUrl) {
@@ -109,8 +142,16 @@ export const RoomPage = ({ id }) => {
     <Grid container>
       <Grid item xs={3} />
       <Grid item xs={6}>
-        <Typography>Welcome to room: {id}</Typography>
-        {/* <Typography>Video URL: {playingVideoUrl}</Typography> */}
+        <Grid container alignItems="center" justifyContent="space-between">
+          <Typography>Welcome to room: {id}</Typography>
+          <Button
+            variant="contained"
+            startIcon={<ShareIcon />}
+            onClick={copyShareLinkToClipboard}
+          >
+            Get share link
+          </Button>
+        </Grid>
 
         <TextField
           id="video-url-input"
@@ -128,9 +169,11 @@ export const RoomPage = ({ id }) => {
 
         <YouTube
           videoId={getYoutubeId()}
-          opts={{ playerVars: { autoplay: 1 } }}
           onStateChange={handleVideoStateChange}
           onReady={handleOnReady}
+          opts={{
+            playerVars: getPlayerOpts(),
+          }}
         />
       </Grid>
     </Grid>
